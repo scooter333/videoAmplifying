@@ -32,15 +32,15 @@ def laplacian(image, numlevels):
 		isColor = True
 
 	# compute gaussian pyramid
-	gPyramid = gaussian(image, numlevels)
+	gausianPyramid = gaussian(image, numlevels)
 
 	# empty laplacian pyramid
-	lPyramid = []
+	laplacianPyramid = []
 
 	# compute laplacian layers for 0 <= i <= N: L_i = g_i - expand(g_{i+1})
-	for i in range(len(gPyramid)-1):
-		a = gPyramid[i]
-		b = cv2.pyrUp(gPyramid[i+1])
+	for i in range(len(gausianPyramid)-1):
+		a = gausianPyramid[i]
+		b = cv2.pyrUp(gausianPyramid[i+1])
 
 		if isColor:
 			a_width, a_height, _ = a.shape
@@ -55,11 +55,11 @@ def laplacian(image, numlevels):
 
 		# take difference of common area (uses saturation arithmetic)
 		if isColor:
-			lPyramid.append( cv2.subtract(a[0:w,0:h,:], b[0:w,0:h,:]) )
+			laplacianPyramid.append( cv2.subtract(a[0:w,0:h,:], b[0:w,0:h,:]) )
 		else:
-			lPyramid.append( cv2.subtract(a[0:w,0:h], b[0:w,0:h]) )
+			laplacianPyramid.append( cv2.subtract(a[0:w,0:h], b[0:w,0:h]) )
 
 	# final laplacian layer is copy of gaussian final layer: L_N = g_N
-	lPyramid.append( gPyramid[-1] )
+	laplacianPyramid.append( gausianPyramid[-1] )
 
-	return lPyramid
+	return laplacianPyramid

@@ -6,9 +6,7 @@ Eulerian Video Magnification (EVM) Demo
 
 import time
 import sys
-
 import cv2
-
 import numpy as np
 
 
@@ -49,40 +47,7 @@ def band_pass_filter(input, wl, wh, sample_rate):
 	return np.real(np.fft.ifft(F, axis=0))
 
 
-class EVM():
-	"""Eulerian Video Magnification"""
-
-	def __init__(self, filename):
-		"""Constructor"""
-		#from cv2 import CV_CAP_PROP_FPS
-	#	from cv import CV_CAP_PROP_FRAME_WIDTH
-	#	from cv import CV_CAP_PROP_FRAME_HEIGHT
-#		from cv import CV_CAP_PROP_FRAME_COUNT
-
-		# create new handle to video
-		self.video = cv2.VideoCapture(filename)
-
-		self.frameWidth = int(self.video.get(cv2.CAP_PROP_FRAME_WIDTH))
-		self.frameHeight = int(self.video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-		self.frameCount = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
-		self.numChannels = 3
-
-		# create windows for original and processed video
-		cv2.namedWindow("original")
-		cv2.namedWindow("processed")
-
-		# position displayed windows
-		cv2.moveWindow("original", 100, 100)
-		cv2.moveWindow("processed", 100 + self.frameWidth + 50, 100)
-
-		# allocate memory for input frames
-		self.in_frames = np.ndarray(shape=(self.frameCount, \
-		                                   self.frameHeight, \
-		                                   self.frameWidth, \
-		                                   self.numChannels), \
-		                            dtype=np.float32)
-
-	def process(self, numlevels=4, alpha=50., chromAttenuation=1.):
+def processImg(filename, numlevels=4, alpha=50., chromAttenuation=1.):
 		"""Process video
 
 		Arguments:
@@ -92,11 +57,32 @@ class EVM():
 	#	from cv import CV_BGR2YCrCb, CV_YCrCb2BGR
 		from pyramid import gaussian
 
-		print ('reading in video...')
-		for frameNumber in range(self.frameCount):
+		video = cv2.VideoCapture(filename)
+
+		frameWidth = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+		frameHeight = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+		frameCount = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+		numChannels = 3
+
+		# create windows for original and processed video
+		cv2.namedWindow("original")
+		cv2.namedWindow("processed")
+
+		# position displayed windows
+		cv2.moveWindow("original", 100, 100)
+		cv2.moveWindow("processed", 100 + frameWidth + 50, 100)
+
+		# allocate memory for input frames
+		in_frames = np.ndarray(shape=(frameCount, \
+		                                   frameHeight, \
+		                                   frameWidth, \
+		                                   numChannels), \
+		                            dtype=np.float32)
+
+		for frameNumber in range(frameCount):
 
 			# read frame of video
-			(retval, frame) = self.video.read()
+			(retval, frame) = video.read()
 			if not retval:
 				break
 
@@ -107,44 +93,40 @@ class EVM():
 			frame = cv2.cvtColor(frame, cv2.COLOR_BGR2YCR_CB)
 
 			# store frame into memory
-			self.in_frames[frameNumber] = frame
+			in_frames[frameNumber] = frame
 
-		print ('computing pyramid...')
 		# compute pyramid on first frame
-		pyramid = gaussian(self.in_frames[0], numlevels)
+		pyramid = gaussian(in_frames[0], numlevels)
 		height, width, _ = pyramid[-1].shape
 
 		# allocate memory for downsampled frames
-		self.ds_frames = np.ndarray(shape=(self.frameCount, \
+		ds_frames = np.ndarray(shape=(frameCount, \
 		                                   height, \
 		                                   width, \
-		                                   self.numChannels), \
+		                                   numChannels), \
 		                            dtype=np.float32)
-		self.ds_frames[0] = pyramid[-1]
+		ds_frames[0] = pyramid[-1]
 		                                      
-		for frameNumber in range(1, self.frameCount):
+		for frameNumber in range(1, frameCount):
 
 			# spatial decomposition (specify laplacian or gaussian)
-			pyramid = gaussian(self.in_frames[frameNumber], numlevels)
+			pyramid = gaussian(in_frames[frameNumber], numlevels)
 
 			# store downsampled frame into memory
-			self.ds_frames[frameNumber] = pyramid[-1]
-
-		print ('filtering...')
-		output = band_pass_filter(self.ds_frames, 50./60., 60./60., 30)
-
-		print ('amplifying...')
+			ds_frames[frameNumber] = pyramid[-1]
+		output = band_pass_filter(ds_frames, 50./60., 60./60., 30)
 		output[:,:,:,0] *= alpha
 		output[:,:,:,1] *= (alpha * chromAttenuation)
 		output[:,:,:,2] *= (alpha * chromAttenuation)
-
-		for i in range(self.frameCount):
+		count = 1
+	
+		for i in range(frameCount):
 			#from cv import CV_INTER_CUBIC
 
-			orig = self.in_frames[i]
+			orig = in_frames[i]
 
 			# enlarge to match size of original frame (keep as 32-bit float)
-			filt = cv2.resize(output[i], (self.frameWidth, self.frameHeight), \
+			filt = cv2.resize(output[i], (frameWidth, frameHeight), \
 			                  interpolation=cv2.INTER_CUBIC)
 			filt = filt.astype(np.float32)
 
@@ -159,13 +141,13 @@ class EVM():
 			# preview
 			cv2.imshow('original', cv2.cvtColor(orig, cv2.COLOR_YCrCb2BGR))
 			cv2.imshow('processed', filt)
+
+
+			#cv2.imwrite('original'+str(count)+'.png',cv2.cvtColor(orig, cv2.COLOR_YCrCb2BGR)*256)
+			#cv2.imwrite('filt'+str(count)+'.png',filt*256)
+	
+			count+=1
 			cv2.waitKey(20)
-
-if __name__ == '__main__':
-	if (len(sys.argv) != 2):
-		print ('usage: evm <file>')
-		sys.exit(-1)
-
-	evm = EVM(sys.argv[1])
-
-	evm.process()
+processImg("evmtest.mp4")
+#fileName = input("Enter video file name in quotes.")
+#processImg(fileName) 
